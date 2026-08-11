@@ -1,0 +1,14 @@
+[npc]
+id = "barkeep"
+name = "Old Marn"
+alias = ["the barkeep"]
+
+[npc.card]
+appearance = "Broad shoulders, a scar across the left brow."
+personality = "Reticent, but never rude."
+speech_style = "Terse. Prefers imperatives."
+goals = ["Keep his tavern out of guild politics."]
+secrets = ["Once ran with the Silver Circle."]
+
+[npc.initial_impression]
+description = "The barkeep at the Hollow Cup. Regulars swear he was somebody once."

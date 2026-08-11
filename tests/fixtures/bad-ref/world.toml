@@ -1,0 +1,15 @@
+[world]
+id = "bad-ref"
+name = "Bad Ref"
+version = "0.1.0"
+
+[world.setting]
+era = "any"
+tone = "any"
+
+[world.initial_tavern]
+name = "Anywhere"
+location = "somewhere"
+description = "A tavern used for reference tests."
+opening_hook = "The stranger at the far table is not on the guest list, but they are here anyway."
+present_npcs = ["ghost"]

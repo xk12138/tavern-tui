@@ -1,0 +1,21 @@
+[template]
+name    = "落魄书生"
+tagline = "屡试不第,身无长物,但眼神干净"
+
+[template.pc]
+background = """
+你叫{{name}},今年二十有六。
+连考三次科举皆不中,盘缠花尽,不敢回乡。
+一身青衫已经洗得发白,行囊里只剩几本书和半块干粮。
+"""
+attribute_tags    = ["熟读经史", "识得字画", "手无缚鸡之力"]
+
+[template.pc.attributes]
+"金钱" = 3
+"精神" = 15
+inventory         = ["旧书三本", "半块干粮", "破笔一支"]
+starting_location = "醉仙楼"
+
+[template.pc.hp]
+current = 12
+max     = 12

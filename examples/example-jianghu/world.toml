@@ -1,0 +1,81 @@
+[world]
+id      = "example-jianghu"
+name    = "江湖夜雨"
+version = "0.1.0"
+author  = "tavern-team"
+license = "CC-BY-SA-4.0"
+tags    = ["武侠", "悬疑", "小人物"]
+description = "褪色的武侠世界,普通人在动荡里谋生。"
+
+[world.setting]
+era     = "架空古代武侠,类唐宋"
+geography = "以中原为核心"
+tech_level = "冷兵器 + 少量机关术,无火药"
+magic   = "无仙术,有武功内力,可传承但不可外传"
+tone    = "冷峻、克制。多写细节和感官,少写形容词。"
+
+[world.rules]
+summary = """
+- 武功需要师门传承,不可自学
+- 内力伤人可致命,但常人一刀也能致命
+- 官府比江湖势力更强,但腐败
+- 医术水平大致等同古代真实水平,重伤难治
+"""
+forbidden = ["现代科技", "外星生物", "时间穿越"]
+
+[world.style]
+prose_style   = "冷峻克制,少形容词多动作"
+sentence_pace = "短句为主,偶尔长句抒情"
+
+[[world.factions]]
+id        = "shaolin"
+name      = "少林寺"
+type      = "武林门派"
+influence = "高"
+stance    = "护道"
+brief     = "武林正道之首,与官府关系微妙"
+
+[[world.factions]]
+id        = "qingbang"
+name      = "青帮"
+type      = "地下势力"
+influence = "中"
+stance    = "利益至上"
+brief     = "控制漕运和地下赌场,与朝廷有默契"
+
+[[world.faction_relations]]
+from = "shaolin"
+to   = "qingbang"
+type = "敌对"
+note = "少林弟子常暗中破坏青帮的漕运"
+
+[[world.timeline]]
+when  = "十年前"
+event = "少林方丈圆寂,继任之争引发内乱"
+
+[[world.timeline]]
+when  = "三年前"
+event = "青帮龙头被刺杀,凶手至今未破"
+
+[[world.timeline]]
+when  = "去年冬"
+event = "洛阳大雪,饿殍遍地,朝廷赈灾不力"
+
+[world.initial_tavern]
+name          = "醉仙楼"
+location      = "洛阳城·西市"
+time_of_day   = "戌时(黄昏)"
+description   = """
+三层木楼,雕花门窗。一楼是散座,二楼有雅间,三楼是掌柜住处。
+现在是饭点,楼下坐了七八桌客人,酒菜味混着说书人的醒木声。
+"""
+present_npcs  = ["shen-shuoshu"]
+opening_hook  = """
+你推门进来,酒香混着桂花的甜味扑面而来。
+角落里,那个自称姓沈的说书人抬眼看了你一下,又低下头。
+掌柜从吧台后面招手:"客官,今日想坐哪儿?"
+"""
+
+[world.plot_pacing]
+honeymoon_turns = 20
+gentle_turns    = 30

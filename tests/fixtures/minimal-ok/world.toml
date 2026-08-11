@@ -1,0 +1,33 @@
+[world]
+id = "minimal-ok"
+name = "Minimal OK"
+version = "0.1.0"
+
+[world.setting]
+era = "fantasy"
+tone = "neutral"
+
+[world.rules]
+summary = "A neutral test world."
+
+[world.initial_tavern]
+name = "The Test Tavern"
+location = "the crossroads"
+description = "A tiny tavern used by the test suite."
+opening_hook = "You wake up at the counter. The bartender polishes a glass and glances at you — long enough to be a hook."
+
+[[world.factions]]
+id = "guild"
+name = "The Guild"
+type = "faction"
+influence = "medium"
+stance = "neutral"
+brief = "A neutral guild."
+
+[[world.timeline]]
+when = "long ago"
+event = "Someone made a promise here and vanished."
+
+[world.plot_pacing]
+honeymoon_turns = 5
+gentle_turns = 15

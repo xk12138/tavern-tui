@@ -1,0 +1,14 @@
+[world]
+id = "no-factions"
+name = "No Factions"
+version = "0.1.0"
+
+[world.setting]
+era = "flat"
+tone = "flat"
+
+[world.initial_tavern]
+name = "Nowhere"
+location = "off-world"
+description = "A quiet place with no factions."
+opening_hook = "You sit alone. Nobody is watching. Nobody has ever been watching. That is the point."

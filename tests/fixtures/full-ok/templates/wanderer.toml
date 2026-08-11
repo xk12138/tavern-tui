@@ -1,0 +1,13 @@
+[template]
+name = "wanderer"
+tagline = "A traveller with light boots and unfinished business."
+
+[template.pc]
+background = "You have been on the road since spring. Nothing has held you long."
+attribute_tags = ["light on your feet"]
+inventory = ["oiled cloak", "small knife"]
+starting_location = "The Hollow Cup"
+
+[template.pc.hp]
+current = 10
+max = 10

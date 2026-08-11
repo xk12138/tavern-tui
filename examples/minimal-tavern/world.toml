@@ -1,0 +1,39 @@
+[world]
+id      = "minimal-tavern"
+name    = "无名酒馆"
+version = "0.1.0"
+author  = "tavern-team"
+description = "一间小酒馆,你不记得自己是怎么来的。作为最小可运行的测试世界。"
+
+[world.setting]
+era  = "架空"
+tone = "开放式,任何题材都可能"
+
+[world.rules]
+summary = "这是一个几乎没有预设规则的世界,一切由玩家和 GM 共同塑造。"
+
+[world.initial_tavern]
+name         = "无名酒馆"
+location     = "十字路口"
+description  = "一间小酒馆,你不记得自己是怎么来的。"
+opening_hook = """
+你在酒馆里醒来,面前的桌上放着一杯温热的酒。
+你不记得自己是谁,也不记得来这里做什么。
+吧台后的老板正在擦拭一只酒杯,眼皮抬起看了你一眼。
+"""
+
+[[world.factions]]
+id        = "unknown"
+name      = "未知势力"
+type      = "神秘"
+influence = "低"
+stance    = "观望"
+brief     = "你隐约觉得这个世界还有你不知道的角色在暗处观察。"
+
+[[world.timeline]]
+when  = "很久以前"
+event = "有人在酒馆里立下了誓言,后来失踪了。"
+
+[world.plot_pacing]
+honeymoon_turns = 5
+gentle_turns    = 15

@@ -1,0 +1,51 @@
+[world]
+id = "full-ok"
+name = "Full OK"
+version = "0.1.0"
+author = "test-suite"
+description = "A worldpack that exercises every optional section."
+
+[world.setting]
+era = "fantasy"
+tone = "somber"
+
+[world.rules]
+summary = "Combat is deadly. Magic requires a mentor."
+
+[world.style]
+prose_style = "spare"
+
+[[world.factions]]
+id = "guild"
+name = "The Guild"
+type = "faction"
+influence = "high"
+stance = "neutral"
+brief = "Long-running merchant guild."
+
+[[world.factions]]
+id = "circle"
+name = "The Silver Circle"
+type = "hidden"
+influence = "medium"
+stance = "hostile-to-guild"
+brief = "Occult society."
+
+[[world.timeline]]
+when = "ten years ago"
+event = "The old guildmaster died in mysterious circumstances."
+
+[[world.timeline]]
+when = "last winter"
+event = "A merchant caravan vanished on the northern road."
+
+[world.initial_tavern]
+name = "The Hollow Cup"
+location = "the harbor town of Marne"
+description = "A dockside tavern popular with off-duty guildsmen."
+opening_hook = "The barkeep slides a note across the counter without meeting your eye. Someone at the far table is watching you eat."
+present_npcs = ["barkeep"]
+
+[world.plot_pacing]
+honeymoon_turns = 10
+gentle_turns = 20

@@ -1,0 +1,5 @@
+[world]
+id = "missing-required"
+name = "Missing Required"
+version = "0.1.0"
+# Deliberately no [world.setting] and no [world.initial_tavern].

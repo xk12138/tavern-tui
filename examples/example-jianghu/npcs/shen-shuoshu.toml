@@ -1,0 +1,22 @@
+[npc]
+id    = "shen-shuoshu"
+name  = "沈先生"
+alias = ["说书人", "沈老"]
+
+[npc.card]
+appearance   = "五十来岁,身材瘦长,右手食指有一道旧疤"
+personality  = "表面豁达实则谨慎;喝三分酒就爱抖机灵,喝多了就装醉"
+speech_style = "半文半白,爱用典故;紧张时会不自觉摸右手食指"
+
+goals   = [
+  "找到当年少林内乱中失踪的师弟",
+  "活下去",
+]
+
+secrets = [
+  "他其实是少林俗家弟子,当年内乱中背叛师门",
+  "他知道青帮龙头被杀案的一部分内情",
+]
+
+[npc.initial_impression]
+description = "醉仙楼的常客,自称说书人。你听人说他讲的故事真假掺半。"

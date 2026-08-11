@@ -1,0 +1,4 @@
+# Deliberately broken: missing the closing quote will make tomllib raise.
+[world
+id = "broken"
+name = "Broken"
