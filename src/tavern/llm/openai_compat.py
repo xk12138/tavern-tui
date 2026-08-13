@@ -190,6 +190,18 @@ def _extract_text(data: dict[str, Any]) -> str:
     if not isinstance(msg, dict):
         raise LLMResponseError(f"response missing message: {first}")
     content = msg.get("content")
-    if not isinstance(content, str) or not content:
-        raise LLMResponseError(f"response missing content: {msg}")
-    return content
+    if isinstance(content, str) and content:
+        return content
+
+    # Reasoning models (DeepSeek R1/V4, o1, …) return content="" and put
+    # the chain-of-thought in `reasoning_content`. If the whole max_tokens
+    # budget got eaten by reasoning, the final answer never got written.
+    # Give the user something actionable instead of dumping the trace.
+    finish = first.get("finish_reason")
+    if msg.get("reasoning_content") or finish == "length":
+        raise LLMResponseError(
+            "provider returned empty content — the reasoning model likely "
+            "used its entire max_tokens budget on chain-of-thought. Try a "
+            "larger max_tokens, or switch to a non-reasoning model."
+        )
+    raise LLMResponseError(f"response missing content: {msg}")

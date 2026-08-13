@@ -550,7 +550,7 @@ def _run_play_loop(pack, provider, save: Save) -> None:
 
         system_prompt, messages = build_turn_messages(save, pack, intent)
         try:
-            reply = provider.complete(messages, system=system_prompt)
+            reply = provider.complete(messages, system=system_prompt, max_tokens=8196)
         except LLMError as exc:
             print(f"[error] {exc}", file=sys.stderr)
             continue

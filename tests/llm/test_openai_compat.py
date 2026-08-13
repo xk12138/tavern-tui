@@ -97,6 +97,34 @@ def test_openai_bad_response_shapes():
         p.complete("hi")
 
 
+def test_openai_reasoning_only_response_hints_at_budget():
+    # Reasoning models (DeepSeek R1/V4, o1) may spend the whole max_tokens
+    # budget on chain-of-thought, returning content="" with a populated
+    # reasoning_content. Error must point at that, not dump the trace.
+    reasoning = "长长的推理内容" * 500
+
+    def reasoning_only(url, body, headers):
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "reasoning_content": reasoning,
+                    },
+                    "finish_reason": "length",
+                }
+            ]
+        }
+
+    p = OpenAIProvider(_openai_cfg(), transport=reasoning_only)
+    with pytest.raises(LLMResponseError) as info:
+        p.complete("hi")
+    err = str(info.value)
+    assert "max_tokens" in err
+    assert reasoning not in err
+
+
 def test_openai_describe_contains_model():
     p = OpenAIProvider(_openai_cfg(model="gpt-4o-mini"))
     assert p.describe() == "OpenAI gpt-4o-mini"
