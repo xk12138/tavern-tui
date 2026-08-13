@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Needed by softprops/action-gh-release to create the release + upload assets.
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: uv run --extra dev pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # hatch-vcs derives version from tags — need full history.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tag matches package version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Strip leading "v" so v0.9.0 → 0.9.0, matching PEP 440.
+          EXPECTED="${TAG#v}"
+          BUILT=$(uvx --from 'hatchling>=1.24' --with 'hatch-vcs>=0.4' \
+                    hatchling version)
+          echo "tag=$TAG built=$BUILT expected=$EXPECTED"
+          if [ "$BUILT" != "$EXPECTED" ]; then
+            echo "::error::Tag $TAG implies version $EXPECTED but hatch-vcs produced $BUILT. Refusing to release."
+            exit 1
+          fi
+          echo "version=$BUILT" >> "$GITHUB_OUTPUT"
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Uses the pushed tag as the release name/tag.
+          name: tavern ${{ needs.build.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: dist/*
+          fail_on_unmatched_files: true
