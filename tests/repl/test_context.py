@@ -40,6 +40,14 @@ def test_build_system_prompt_includes_summary_when_given(FIXTURES_DIR):
     assert "LOAD BEARING SUMMARY" in s
 
 
+def test_build_system_prompt_forbids_deciding_for_player(FIXTURES_DIR):
+    """Narrator must never take actions on the PC's behalf. This is a load-
+    bearing engine-level rule; guard it from silent removal."""
+    pack = _load_pack(FIXTURES_DIR)
+    s = build_system_prompt(pack)
+    assert "Player autonomy is absolute" in s
+
+
 def test_build_turn_messages_short_history(tavern_home, FIXTURES_DIR):
     pack = _load_pack(FIXTURES_DIR)
     save = Save.new("m1", world_id="minimal-ok")

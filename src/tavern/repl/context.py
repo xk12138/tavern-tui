@@ -51,6 +51,22 @@ def build_system_prompt(pack: WorldPack, summary_text: str | None = None) -> str
         parts.append(f"World rules:\n{rules}")
     parts.append(INPUT_SYNTAX_PROMPT)
     parts.append(
+        "Player autonomy is absolute. Never decide, narrate, or imply any concrete "
+        "action, choice, dialogue, thought, or plan on the player character's "
+        "behalf — no matter how natural or trivial it seems. Only advance the "
+        "world's reaction to what the player has actually stated, plus ambient "
+        "events unrelated to the player character's will. If the player's intent "
+        "is vague or high-level (e.g. \"go to the gym\", \"figure out how to spend "
+        "money\"), stop at the point where the next decision is theirs: describe "
+        "the scene, the people present, and the options visible to them, then "
+        "hand control back with a beat that invites input. Do not skip ahead in "
+        "time, do not schedule future commitments, do not put words in their "
+        "mouth. Exceptions: (a) the player explicitly delegates (\"just run "
+        "through it\", \"skip to X\"); (b) unavoidable consequences of an action "
+        "the player has already committed to (falling after jumping, bleeding "
+        "after being cut)."
+    )
+    parts.append(
         "Respond in second person, present tense. Keep replies under 3 short paragraphs. "
         "Do not break character."
     )
