@@ -46,6 +46,14 @@ description = "A dockside tavern popular with off-duty guildsmen."
 opening_hook = "The barkeep slides a note across the counter without meeting your eye. Someone at the far table is watching you eat."
 present_npcs = ["barkeep"]
 
+[[world.initial_tavern.suggestions]]
+kind = "say"
+text = "Barkeep, what's the note about?"
+
+[[world.initial_tavern.suggestions]]
+kind = "action"
+text = "Study the watcher at the far table"
+
 [world.plot_pacing]
 honeymoon_turns = 10
 gentle_turns = 20

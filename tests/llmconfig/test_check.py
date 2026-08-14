@@ -106,6 +106,29 @@ def test_Cw02_bad_ui_speed(tavern_home, monkeypatch):
     assert "Cw02" in codes
 
 
+def test_Cw02_bad_ui_suggestions(tavern_home):
+    _write(
+        config_path(),
+        '[llm.default]\nprovider = "ollama"\nmodel = "qwen2.5:14b"\n'
+        'base_url = "http://localhost:11434"\n\n'
+        "[ui]\nsuggestions = \"yes\"\n",
+    )
+    diags = check_config()
+    codes = {d.code for d in diags}
+    assert "Cw02" in codes
+
+
+def test_ui_suggestions_ok(tavern_home):
+    _write(
+        config_path(),
+        '[llm.default]\nprovider = "ollama"\nmodel = "qwen2.5:14b"\n'
+        'base_url = "http://localhost:11434"\n\n'
+        "[ui]\nsuggestions = false\n",
+    )
+    diags = check_config()
+    assert not any(d.code == "Cw02" for d in diags)
+
+
 def test_all_good(tavern_home):
     _write(
         config_path(),

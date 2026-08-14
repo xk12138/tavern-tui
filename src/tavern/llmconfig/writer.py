@@ -175,7 +175,7 @@ def _to_toml(cfg: Config) -> str:
     """
     lines: list[str] = []
 
-    for role in ("default", "extractor", "director", "memory_keeper", "export"):
+    for role in ("default", "extractor", "director", "memory_keeper", "export", "suggest"):
         role_cfg = cfg.llm.get(role)
         if role_cfg is None:
             continue

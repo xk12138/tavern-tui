@@ -71,6 +71,7 @@ def validate_worldpack(path: str | Path) -> ValidationReport:
     diagnostics.extend(_rule_honeymoon(pack))
     diagnostics.extend(_rule_opening_hook(pack))
     diagnostics.extend(_rule_npc_card_quality(pack))
+    diagnostics.extend(_rule_suggestion_quality(pack))
 
     # ── informational stats ─────────────────────────────────────────────
     diagnostics.append(_diag_stats(pack))
@@ -421,6 +422,52 @@ def _rule_npc_card_quality(pack: WorldPack) -> list[Diagnostic]:
                     message=f"npc '{npc.id}' has no secrets",
                     location=source,
                     hint="secrets are the primary source of dramatic tension",
+                )
+            )
+    return out
+
+
+def _rule_suggestion_quality(pack: WorldPack) -> list[Diagnostic]:
+    raw = pack.world.initial_tavern.get("suggestions")
+    if not isinstance(raw, list):
+        return []
+    out: list[Diagnostic] = []
+    for i, item in enumerate(raw):
+        where = _world_location(pack)
+        if not isinstance(item, dict):
+            out.append(
+                Diagnostic(
+                    level="warning",
+                    code="W010",
+                    message=f"initial_tavern.suggestions[{i}] is not a table",
+                    location=where,
+                    hint="each suggestion needs kind = 'say' | 'think' | 'action' and a text",
+                )
+            )
+            continue
+        kind = item.get("kind")
+        text = item.get("text")
+        if kind not in ("say", "think", "action"):
+            out.append(
+                Diagnostic(
+                    level="warning",
+                    code="W010",
+                    message=(
+                        f"initial_tavern.suggestions[{i}].kind = {kind!r} "
+                        "is not say | think | action"
+                    ),
+                    location=where,
+                    hint="write player-first-person lines; see WORLD_BUILDING.md §2.6",
+                )
+            )
+        if not isinstance(text, str) or not text.strip():
+            out.append(
+                Diagnostic(
+                    level="warning",
+                    code="W010",
+                    message=f"initial_tavern.suggestions[{i}].text is missing or empty",
+                    location=where,
+                    hint="the text is shown verbatim as a selectable player line",
                 )
             )
     return out

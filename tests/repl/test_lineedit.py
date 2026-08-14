@@ -19,9 +19,14 @@ import sys
 import pytest
 
 from tavern.repl.lineedit import (
+    FREE_INPUT_LABEL,
+    SuggestionChoice,
     _Line,
+    _suggest_loop,
     display_width,
     readline_wide,
+    render_choices_block,
+    render_choices_plain,
     string_width,
 )
 
@@ -129,6 +134,245 @@ def test_line_backspace_absorbs_combining_marks():
     assert line.text == ""
 
 
+# ── suggestion selection: pure logic ──────────────────────────────────────
+
+
+def _choices() -> list[SuggestionChoice]:
+    return [
+        SuggestionChoice(label='"say this"', value='"say this"'),
+        SuggestionChoice(label="do that", value="do that"),
+        SuggestionChoice(label=FREE_INPUT_LABEL, value=None),
+    ]
+
+
+def _drive_keys(chunks: list[bytes], *, use_color: bool = False):
+    """Drive `_suggest_loop` with mocked os.read chunks (no pty needed).
+
+    Returns (result, transcript). EOFError → "__EOF__", KeyboardInterrupt
+    → "__KBD__".
+    """
+    import io
+    from unittest import mock
+
+    out = io.StringIO()
+    reads = iter(chunks + [b""])
+    with mock.patch(
+        "tavern.repl.lineedit.os.read", side_effect=lambda fd, n: next(reads)
+    ):
+        try:
+            return _suggest_loop(0, out, _choices(), "> ", use_color), out.getvalue()
+        except EOFError:
+            return "__EOF__", out.getvalue()
+        except KeyboardInterrupt:
+            return "__KBD__", out.getvalue()
+
+
+def test_suggest_loop_enter_commits_first_choice():
+    result, _ = _drive_keys([b"\r"])
+    assert result == '"say this"'
+
+
+def test_suggest_loop_arrow_down_commits_second():
+    result, _ = _drive_keys([b"\x1b[B", b"\r"])
+    assert result == "do that"
+
+
+def test_suggest_loop_up_at_top_stays_first():
+    result, _ = _drive_keys([b"\x1b[A", b"\r"])
+    assert result == '"say this"'
+
+
+def test_suggest_loop_typing_jumps_to_free_option_and_stays_green():
+    """The core UX: typing must NOT dismiss the list — it highlights the
+    free option (green) and the list stays up until Enter."""
+    result, transcript = _drive_keys([b"h", b"i", b"\r"], use_color=True)
+    assert result == "hi"
+    # The free option turned green…
+    assert f"\033[32m[3] {FREE_INPUT_LABEL}\033[0m" in transcript
+    # …and the list was re-rendered twice (first render + the jump to the
+    # free option), i.e. still on screen while typing — not erased.
+    assert transcript.count('[1] "say this"') >= 2
+
+
+def test_suggest_loop_cjk_typing_lands_in_buffer():
+    result, _ = _drive_keys(["\u4f60\u597d".encode("utf-8"), b"\r"])
+    assert result == "你好"
+
+
+def test_suggest_loop_backspace_edits_buffer():
+    result, _ = _drive_keys([b"h", b"i", b"\x7f", b"\r"])
+    assert result == "h"
+
+
+def test_suggest_loop_free_option_empty_enter_keeps_waiting():
+    """Enter on 说点什么 with an empty buffer does nothing; typing then
+    submitting works."""
+    result, _ = _drive_keys([b"\x1b[B", b"\x1b[B", b"\r", b"x", b"\r"])
+    assert result == "x"
+
+
+def test_suggest_loop_typed_text_wins_over_arrow_selection():
+    """Type first, arrow to a suggestion, Enter → the typed text submits."""
+    result, _ = _drive_keys([b"h", b"\x1b[A", b"\r"])
+    assert result == "h"
+
+
+def test_suggest_loop_ctrl_c_and_ctrl_d():
+    assert _drive_keys([b"\x03"])[0] == "__KBD__"
+    assert _drive_keys([b"\x04"])[0] == "__EOF__"
+
+
+def test_suggest_loop_ctrl_d_with_text_ignored():
+    result, _ = _drive_keys([b"h", b"\x04", b"\r"])
+    assert result == "h"
+
+
+# ── virtual-terminal redraw regression ────────────────────────────────────
+#
+# The suggest-mode redraws emit cursor-up (`ESC [ n A`) and whole-line
+# erase (`ESC [ 2 K`) sequences. A plain StringIO transcript can't tell
+# whether those land correctly, so we replay them on a tiny virtual screen
+# that starts with the opening text ABOVE the block — the setup that
+# exposed the "> accumulates and covers the text" bug (an off-by-one in the
+# cursor-up count shifted the block up one row per redraw).
+
+
+def _simulate_screen(transcript: str, initial_lines: list[str], start_row: int) -> list[str]:
+    lines = list(initial_lines)
+    row, col = start_row, 0
+    i = 0
+    while i < len(transcript):
+        ch = transcript[i]
+        if ch == "\x1b":
+            if i + 1 < len(transcript) and transcript[i + 1] == "[":
+                j = i + 2
+                while j < len(transcript) and not ("@" <= transcript[j] <= "~"):
+                    j += 1
+                if j < len(transcript):
+                    params, final = transcript[i + 2 : j], transcript[j]
+                    if final == "A":  # cursor up
+                        row = max(0, row - int(params or "1"))
+                    elif final == "B":  # cursor down
+                        row += int(params or "1")
+                    elif final == "K":  # erase line (2 = whole line)
+                        lines[row] = "" if params == "2" else lines[row][:col]
+                    i = j
+            else:
+                i += 1
+            i += 1
+            continue
+        if ch == "\r":
+            col = 0
+        elif ch == "\n":
+            row += 1
+            col = 0
+            if row >= len(lines):
+                lines.append("")
+        else:
+            while row >= len(lines):
+                lines.append("")
+            if col < len(lines[row]):
+                lines[row] = lines[row][:col] + ch + lines[row][col + 1 :]
+            else:
+                lines[row] += ch
+            col += 1
+        i += 1
+    return lines
+
+
+def test_suggest_redraw_keeps_single_prompt_line_and_preserves_text_above():
+    """The reported bug: pressing ↑/↓ stacked "> " prompts and crept the
+    list up over the text above. After the fix, repeated redraws leave
+    exactly one prompt line and never touch the rows above the block."""
+    import io
+    from unittest import mock
+
+    out = io.StringIO()
+    keys = [b"\x1b[B", b"\x1b[B", b"\x1b[B", b"\x1b[A", b"\x1b[B", b"\x1b[A", b""]
+    reads = iter(keys)
+    with mock.patch(
+        "tavern.repl.lineedit.os.read", side_effect=lambda fd, n: next(reads)
+    ):
+        try:
+            _suggest_loop(0, out, _choices(), "> ", use_color=False)
+        except EOFError:
+            pass
+
+    above = ["夜色里,那道目光的主人终于动了……", "", "(provider: DeepSeek ...)", ""]
+    screen = _simulate_screen(out.getvalue(), above, start_row=3)
+    assert screen.count("> ") == 1
+    # The list stays exactly where it was first rendered (rows 3–5)…
+    assert screen[3].startswith('  [1] "say this"')
+    assert screen[4] == "  [2] do that"
+    assert screen[5] == f"  [3] {FREE_INPUT_LABEL}"
+    # …and the text above the block is untouched.
+    assert screen[0].startswith("夜色里")
+    assert screen[2].startswith("(provider:")
+
+
+def test_suggest_commit_clears_block_and_prompts_in_place():
+    import io
+    from unittest import mock
+
+    out = io.StringIO()
+    keys = [b"\x1b[B", b"\r", b""]  # ↓ to [2], Enter commits it
+    reads = iter(keys)
+    with mock.patch(
+        "tavern.repl.lineedit.os.read", side_effect=lambda fd, n: next(reads)
+    ):
+        result = _suggest_loop(0, out, _choices(), "> ", use_color=False)
+
+    assert result == "do that"
+    above = ["夜色里,那道目光的主人终于动了……", "", "(provider: DeepSeek ...)", ""]
+    screen = _simulate_screen(out.getvalue(), above, start_row=3)
+    # The block is gone; the committed line sits at the block's top row and
+    # no stale prompt remains anywhere below.
+    assert screen[3] == "> do that"
+    assert screen.count("> ") == 0  # "> do that" isn't a bare "> "
+
+
+def test_render_choices_block_highlights_selected_green_free_gray():
+    c = _choices()
+    block = render_choices_block(c, selected=0, prompt="> ", use_color=True)
+    assert "\033[32m[1] \"say this\"\033[0m" in block
+    assert "[2] do that" in block
+    assert f"\033[90m[3] {FREE_INPUT_LABEL}\033[0m" in block
+    assert block.endswith("> ")
+
+
+def test_render_choices_block_includes_typed_buffer():
+    c = _choices()
+    block = render_choices_block(c, selected=2, prompt="> ", use_color=True, buffer="hello")
+    assert block.endswith("> hello")
+    assert f"\033[32m[3] {FREE_INPUT_LABEL}\033[0m" in block
+
+
+def test_render_choices_block_no_color():
+    c = _choices()
+    block = render_choices_block(c, selected=0, prompt="> ", use_color=False)
+    # No color codes — and the left edge is fixed-width so the rows align.
+    assert "\033[32m" not in block
+    assert "\033[90m" not in block
+    assert "[1] \"say this\"" in block
+
+
+def test_render_choices_block_rows_aligned():
+    """Every row starts at column 2 with a `[N] ` marker, so every label
+    starts at column 6 — alignment regression guard for the "选项前面没
+    对齐" complaint."""
+    c = _choices()
+    block = render_choices_block(c, selected=0, prompt="> ", use_color=False)
+    for row in block.split("\n")[:-1]:
+        assert row[2] == "["
+        assert row[5] == " "  # marker is exactly "[N] " → label at col 6
+
+
+def test_render_choices_plain_numbered():
+    c = _choices()
+    plain = render_choices_plain(c)
+    assert plain == '  [1] "say this"\n  [2] do that\n  [3] 说点什么…\n'
+
+
 # ── end-to-end (pty) ─────────────────────────────────────────────────────
 
 
@@ -139,7 +383,12 @@ pytestmark_pty = pytest.mark.skipif(
 )
 
 
-def _drive(inputs: bytes, *, prompt: str = "> ") -> tuple[str, str]:
+def _drive(
+    inputs: bytes,
+    *,
+    prompt: str = "> ",
+    choices: list[SuggestionChoice] | None = None,
+) -> tuple[str, str]:
     """Fork a child that runs readline_wide on a pty; feed it `inputs`.
 
     A non-empty `prompt` doubles as a race-free sync sentinel: the parent
@@ -154,7 +403,9 @@ def _drive(inputs: bytes, *, prompt: str = "> ") -> tuple[str, str]:
             real_stdin = os.fdopen(0, "rb", buffering=0)
             real_stdout = os.fdopen(1, "wb", buffering=0)
             try:
-                line = readline_wide(prompt, stdin=real_stdin, stdout=real_stdout)
+                line = readline_wide(
+                    prompt, stdin=real_stdin, stdout=real_stdout, choices=choices
+                )
             except EOFError:
                 os.write(1, b"__EOF__")
                 os._exit(0)
@@ -287,6 +538,46 @@ def test_pty_ctrl_d_on_empty_line_raises_eof():
 def test_pty_prompt_is_written():
     _, transcript = _drive(b"\r", prompt="tavern> ")
     assert "tavern> " in transcript
+
+
+# ── end-to-end: suggestion selection (pty) ────────────────────────────────
+
+
+@pytestmark_pty
+def test_pty_suggest_enter_commits_first_choice():
+    c = _choices()
+    line, _ = _drive(b"\r", choices=c)
+    assert line == "say this"
+
+
+@pytestmark_pty
+def test_pty_suggest_arrow_down_commits_second():
+    c = _choices()
+    line, _ = _drive(b"\x1b[B\r", choices=c)
+    assert line == "do that"
+
+
+@pytestmark_pty
+def test_pty_suggest_up_at_top_stays_first():
+    c = _choices()
+    line, _ = _drive(b"\x1b[A\r", choices=c)
+    assert line == "say this"
+
+
+@pytestmark_pty
+def test_pty_suggest_typing_commits_on_enter():
+    """Typing highlights the free option; the list stays until Enter submits."""
+    c = _choices()
+    line, _ = _drive(b"hello\r", choices=c)
+    assert line == "hello"
+
+
+@pytestmark_pty
+def test_pty_suggest_free_option_then_type():
+    """Down twice to 说点什么, Enter, then type freely."""
+    c = _choices()
+    line, _ = _drive(b"\x1b[B\x1b[B\rhi\r", choices=c)
+    assert line == "hi"
 
 
 # ── fallback path (no TTY) ───────────────────────────────────────────────

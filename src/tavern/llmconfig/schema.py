@@ -70,7 +70,7 @@ PROVIDERS: dict[str, ProviderMeta] = {
 
 
 # Roles we track separately in [llm.<role>] sections.
-LLM_ROLES = ("default", "extractor", "director", "memory_keeper", "export")
+LLM_ROLES = ("default", "extractor", "director", "memory_keeper", "export", "suggest")
 
 
 @dataclass
@@ -91,6 +91,9 @@ class UIConfig:
 
     typewriter_speed_ms: int = 20
     color_scheme: str = "default"
+    # Show the suggested-player-line list after each GM reply. Off disables
+    # the per-turn LLM suggestion call entirely.
+    suggestions: bool = True
 
 
 @dataclass
@@ -151,4 +154,6 @@ def coerce_ui(raw: Any) -> UIConfig:
         ui.typewriter_speed_ms = raw["typewriter_speed_ms"]
     if isinstance(raw.get("color_scheme"), str):
         ui.color_scheme = raw["color_scheme"]
+    if isinstance(raw.get("suggestions"), bool):
+        ui.suggestions = raw["suggestions"]
     return ui

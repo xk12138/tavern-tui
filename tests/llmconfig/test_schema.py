@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from tavern.llmconfig.schema import is_secret_field, mask_secret
+from tavern.llmconfig.schema import (
+    LLM_ROLES,
+    UIConfig,
+    coerce_ui,
+    is_secret_field,
+    mask_secret,
+)
 
 
 def test_mask_empty():
@@ -33,3 +39,17 @@ def test_secret_field_detection():
     assert not is_secret_field("provider")
     assert not is_secret_field("model")
     assert not is_secret_field("base_url")
+
+
+def test_suggest_role_is_known():
+    assert "suggest" in LLM_ROLES
+
+
+def test_ui_suggestions_default_on():
+    assert UIConfig().suggestions is True
+
+
+def test_coerce_ui_suggestions_bool():
+    assert coerce_ui({"suggestions": False}).suggestions is False
+    assert coerce_ui({"suggestions": "no"}).suggestions is True  # non-bool ignored
+    assert coerce_ui(None).suggestions is True

@@ -5,7 +5,13 @@ from tavern.repl.context import (
     build_system_prompt,
     build_turn_messages,
 )
-from tavern.repl.lineedit import readline_wide
+from tavern.repl.lineedit import (
+    FREE_INPUT_LABEL,
+    SuggestionChoice,
+    readline_wide,
+    render_choices_block,
+    render_choices_plain,
+)
 from tavern.repl.observe import (
     render_inv,
     render_relations,
@@ -25,7 +31,11 @@ __all__ = [
     "parse_input",
     "SHORTCUT_MAP",
     "INPUT_SYNTAX_PROMPT",
+    "SuggestionChoice",
+    "FREE_INPUT_LABEL",
     "readline_wide",
+    "render_choices_block",
+    "render_choices_plain",
     "render_where",
     "render_who",
     "render_inv",

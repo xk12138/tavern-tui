@@ -125,6 +125,17 @@ def check_config() -> list[Diagnostic]:
                     hint="expected an integer in [0, 1000]",
                 )
             )
+        suggestions = ui.get("suggestions")
+        if suggestions is not None and not isinstance(suggestions, bool):
+            diags.append(
+                Diagnostic(
+                    level="warning",
+                    code="Cw02",
+                    message=f"[ui].suggestions={suggestions!r} is not a boolean",
+                    location=str(p),
+                    hint="expected true or false (default: true)",
+                )
+            )
 
     return diags
 

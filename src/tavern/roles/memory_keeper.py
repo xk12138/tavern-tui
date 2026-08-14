@@ -10,7 +10,13 @@ Design choices:
   * Single function, no class — matches how `export/novel.py` treats the
     provider. A stateful class would just be a call-convention.
   * The summary target is ~200 tokens (DESIGN.md §五 L2). We pass
-    max_tokens=400 to give the model headroom without wasting budget.
+    max_tokens=393216 (384K) so reasoning models (DeepSeek R1/V4, o1,
+    extended-thinking Claude, …) have effectively unbounded room to
+    spend on chain-of-thought before writing the 200-token summary.
+    Non-reasoning models don't actually consume the headroom —
+    `max_tokens` is an upper bound, not a target. If a provider rejects
+    the value as too large, the caller's `except LLMError` swallows it
+    and the next tick retries; the game does not stall.
   * Transcript uses "Player:" / "GM:" prefixes rather than replaying
     `llm_line` shapes — we're summarising, not re-narrating.
 """
@@ -78,5 +84,5 @@ def compress(
         f"New transcript:\n{_format_transcript(raw_turns)}\n\n"
         "Write the updated summary now."
     )
-    reply = provider.complete(user_prompt, system=system_prompt, max_tokens=400)
+    reply = provider.complete(user_prompt, system=system_prompt, max_tokens=393216)
     return reply.strip()

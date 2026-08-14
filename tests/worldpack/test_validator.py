@@ -169,6 +169,27 @@ def test_W009_npc_missing_goals_or_secrets(tmp_path: Path):
     assert warn_codes.count("W009") == 2
 
 
+def test_W010_invalid_suggestion_entries(tmp_path: Path):
+    (tmp_path / "world.toml").write_text(
+        '[world]\nid="w10"\nname="W10"\nversion="0.1.0"\n'
+        '[world.setting]\nera="x"\ntone="x"\n'
+        '[world.initial_tavern]\nname="a"\nlocation="b"\n'
+        'description="c"\nopening_hook="' + "hook " * 20 + '"\n'
+        '[[world.initial_tavern.suggestions]]\nkind="shout"\ntext="hi"\n'
+        '[[world.initial_tavern.suggestions]]\nkind="say"\ntext=""\n',
+        encoding="utf-8",
+    )
+    report = validate_worldpack(tmp_path / "world.toml")
+    warn_codes = [d.code for d in report.warnings]
+    assert warn_codes.count("W010") == 2
+    assert report.ok is True  # suggestions are optional, so warnings only
+
+
+def test_W010_valid_suggestions_no_warning(FIXTURES_DIR):
+    report = validate_worldpack(FIXTURES_DIR / "full-ok")
+    assert "W010" not in {d.code for d in report.warnings}
+
+
 # ── strict mode combines error+warning into pass/fail ────────────────────
 
 

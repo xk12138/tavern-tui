@@ -14,6 +14,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -32,7 +33,9 @@ from tavern.llmconfig import (
     mask_secret,
 )
 from tavern.repl import (
+    FREE_INPUT_LABEL,
     INPUT_SYNTAX_PROMPT,
+    SuggestionChoice,
     build_system_prompt,
     build_turn_messages,
     parse_input,
@@ -44,6 +47,12 @@ from tavern.repl import (
     render_who,
 )
 from tavern.roles.memory_keeper import compress as memory_keeper_compress
+from tavern.roles.suggester import (
+    Suggestion,
+    static_suggestions,
+    suggest,
+    suggestion_to_raw,
+)
 from tavern.save import (
     Save,
     SaveError,
@@ -502,10 +511,18 @@ def _find_installed_world(world_id: str) -> InstalledWorld | None:
 # so slash-command handlers can reach it without re-plumbing every signature.
 _REPL_PROVIDER = None
 
+# Scene suggestions: the current hint line's selectable suggestions and the
+# session-level on/off switch. Same module-global glue pattern as
+# _REPL_PROVIDER — the play loop owns them, slash handlers read/write them.
+_CURRENT_SUGGESTIONS: list[Suggestion] = []
+_SUGGEST_ENABLED = True
+
 
 def _run_play_loop(pack, provider, save: Save) -> None:
-    global _REPL_PROVIDER
+    global _REPL_PROVIDER, _SUGGEST_ENABLED
     _REPL_PROVIDER = provider
+    # Session default comes from [ui].suggestions; /hint on|off overrides it.
+    _SUGGEST_ENABLED = load_config().ui.suggestions
     tavern_name = pack.world.initial_tavern.get("name", "?")
     state = save.state
 
@@ -531,14 +548,41 @@ def _run_play_loop(pack, provider, save: Save) -> None:
     print(f"(provider: {provider.describe()})")
     print("(type /help for commands, /quit to exit)\n")
 
+    # The first suggestion list is generated now, before the first prompt.
+    # With a reasoning model this call can take a few seconds — say so
+    # instead of leaving the player staring at a frozen screen.
+    if _SUGGEST_ENABLED:
+        print("(preparing suggestions…)", flush=True)
+    _maybe_suggest(pack, save, provider)
+
     while True:
         try:
-            line = readline_wide("> ").strip()
+            if _CURRENT_SUGGESTIONS:
+                # Interactive arrow-key selection (Claude Code style); typed
+                # `[N]` / `:N` still works as a non-TTY fallback.
+                line = readline_wide("> ", choices=_build_suggest_choices()).strip()
+            else:
+                line = readline_wide("> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye.")
             return
         if not line:
             continue
+
+        # [1] / :1 — pick a suggested player line by typing its number
+        # (mainly for piped/non-TTY sessions where arrows aren't available).
+        pick = _match_suggest_selection(line)
+        if pick is not None:
+            if not _CURRENT_SUGGESTIONS:
+                pass  # no hint row; fall through to free input
+            elif 0 <= pick < len(_CURRENT_SUGGESTIONS):
+                line = suggestion_to_raw(_CURRENT_SUGGESTIONS[pick])
+            elif pick == len(_CURRENT_SUGGESTIONS):
+                # The trailing "说点什么" option — hand control back to typing.
+                continue
+            else:
+                print(f"[no suggestion {pick + 1}] — type /hint to refresh")
+                continue
 
         intent = parse_input(line)
 
@@ -565,6 +609,46 @@ def _run_play_loop(pack, provider, save: Save) -> None:
 
         if _should_compress(save):
             _run_compression(save, provider, pack)
+
+        _maybe_suggest(pack, save, provider)
+
+
+def _match_suggest_selection(line: str) -> int | None:
+    """Return the 0-based suggestion index for `[N]` / `:N`, else None."""
+    m = re.fullmatch(r"(?:\[(\d)\]|:(\d))", line)
+    if not m:
+        return None
+    return int(m.group(1) or m.group(2)) - 1
+
+
+def _build_suggest_choices() -> list[SuggestionChoice]:
+    """Turn the live suggestions into selectable rows + the free-input tail."""
+    choices = [
+        SuggestionChoice(label=suggestion_to_raw(s), value=suggestion_to_raw(s))
+        for s in _CURRENT_SUGGESTIONS
+    ]
+    choices.append(SuggestionChoice(label=FREE_INPUT_LABEL, value=None))
+    return choices
+
+
+def _maybe_suggest(pack, save: Save, provider) -> None:
+    """Refresh the live suggestion list.
+
+    Called at session start (before the first prompt) and after every GM
+    reply. Always goes through the Suggest role — even at turn 0, where the
+    opening hook seeds the context — with static worldpack suggestions
+    leading and any failure falling back to them. A provider failure never
+    reaches the player. Rendering happens at the next prompt
+    (`readline_wide`'s suggest mode), not here.
+    """
+    global _CURRENT_SUGGESTIONS
+    if not _SUGGEST_ENABLED:
+        _CURRENT_SUGGESTIONS = []
+        return
+    _CURRENT_SUGGESTIONS = suggest(
+        provider, pack, save,
+        static=static_suggestions(pack),
+    )
 
 
 def _handle_slash(line: str, save: Save, pack) -> str:
@@ -617,7 +701,29 @@ def _handle_slash(line: str, save: Save, pack) -> str:
         print(render_relations(pack, save))
         return "continue"
 
+    if cmd == "/hint":
+        return _handle_hint(arg, save, pack)
+
     print(f"[unknown command] {cmd} — type /help")
+    return "continue"
+
+
+def _handle_hint(arg: str, save: Save, pack) -> str:
+    """`/hint` (refresh) · `/hint off` (disable) · `/hint on` (re-enable)."""
+    global _SUGGEST_ENABLED, _CURRENT_SUGGESTIONS
+    arg = arg.strip()
+    if arg == "off":
+        _SUGGEST_ENABLED = False
+        _CURRENT_SUGGESTIONS = []
+        print("Suggestions off. Type /hint on to re-enable, /hint to refresh.")
+    elif arg == "on":
+        _SUGGEST_ENABLED = True
+        _maybe_suggest(pack, save, _REPL_PROVIDER)
+        print("Suggestions on.")
+    elif not _SUGGEST_ENABLED:
+        print("Suggestions are off. Type /hint on to enable.")
+    else:
+        _maybe_suggest(pack, save, _REPL_PROVIDER)
     return "continue"
 
 
@@ -734,7 +840,13 @@ def _print_repl_help() -> None:
     print('  "..."             character speech')
     print("  *...*             internal thought")
     print("  :look :wait ...   shortcut actions (also :rest :inventory :map :recap)")
+    print("  ↑/↓ + Enter       pick a suggested player line (green = current)")
+    print("  [1] [2] [3]       pick by number (piped/non-interactive sessions)")
     print("  otherwise         free-form action")
+    print()
+    print("Suggestions:")
+    print("  /hint             refresh the suggested-player-line list")
+    print("  /hint on|off      toggle suggestions (default: on, per [ui])")
     print()
     print("Observation commands:")
     print("  /where            show current scene")
