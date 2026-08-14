@@ -547,7 +547,7 @@ def test_pty_prompt_is_written():
 def test_pty_suggest_enter_commits_first_choice():
     c = _choices()
     line, _ = _drive(b"\r", choices=c)
-    assert line == "say this"
+    assert line == '"say this"'
 
 
 @pytestmark_pty
@@ -561,7 +561,7 @@ def test_pty_suggest_arrow_down_commits_second():
 def test_pty_suggest_up_at_top_stays_first():
     c = _choices()
     line, _ = _drive(b"\x1b[A\r", choices=c)
-    assert line == "say this"
+    assert line == '"say this"'
 
 
 @pytestmark_pty
